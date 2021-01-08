@@ -1,6 +1,6 @@
 // This is the cluster renderer module for Density.
 
-export function Cluster(clusterDrawables, priority, pos, size) {
+export default function Cluster(clusterDrawables, priority, pos, size) {
   this.drawables = clusterDrawables; // Run new PriorityQueue() to create an empty priority queue
   this.pos = pos;
   this.size = size;

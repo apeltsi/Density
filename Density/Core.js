@@ -171,8 +171,8 @@ class PriorityQueue {
 //#endregion
 
 //#region Math Library
-var math = {};
-math.Distance = function (avec, bvec) {
+export var math = {};
+math.distance = function (avec, bvec) {
   var a = avec.x - bvec.x;
   var b = avec.y - bvec.y;
 
@@ -181,12 +181,13 @@ math.Distance = function (avec, bvec) {
 math.OneDDistance = function (apos, bpos) {
   var a = apos - bpos;
 
-  return Math.sqrt(a * a);
+  return Math.abs(a);
 };
-math.lerp = function (value1, value2, amount) {
-  amount = amount < 0 ? 0 : amount;
-  amount = amount > 1 ? 1 : amount;
-  return value1 + (value2 - value1) * amount;
+math.lerp = function (v0, v1, t) {
+  return v0 * (1 - t) + v1 * t;
+};
+math.veclerp = function (v0, v1, t) {
+  return new Vec2(v0.x * (1 - t) + v1.x * t, v0.y * (1 - t) + v1.y * t);
 };
 math.clamp = function (value, min, max) {
   if (value > max) {
@@ -276,13 +277,13 @@ math.getBoundingBox = function (points, width) {
   return boundingBox;
 };
 //#endregion
-engineCore.math = math;
-
 // THIS SCRIPT HANDLES THE RENDERING SYSTEM
 var canvas = document.getElementById("maincanvas");
+engineCore.canvas = canvas;
 var c = canvas.getContext("2d");
 var drawables = new PriorityQueue(); // DRAWABLES OR RENDER QUEUE
 var updatefuncs = [];
+var resizefuncs = [];
 var idsInUse = [];
 var lastID = 0;
 var renderScale = 1;
@@ -293,14 +294,14 @@ var mouseIsOverCanvas = true;
 var drawFuncs = []; // this array holds all of the draw funcs
 var lastFrameTime = 0;
 var currentFrameTime = 0;
-engineCore.mouseX = 0;
-engineCore.mouseY = 0;
-engineCore.width = canvas.width;
-engineCore.height = canvas.height;
-engineCore.camPos = new Vec2(0, 0);
+export var mouseX = 0;
+export var mouseY = 0;
+export var width = canvas.width;
+export var height = canvas.height;
+export var camPos = new Vec2(0, 0);
 var mouseMoveEvent = function (event) {
-  engineCore.mouseX = event.x;
-  engineCore.mouseY = -event.y;
+  mouseX = event.x;
+  mouseY = height - event.y;
   if (-event.y > 0) {
     mouseIsOverCanvas = false;
   } else {
@@ -313,19 +314,19 @@ engineCore.init = function initialize() {
   window.addEventListener("mousemove", mouseMoveEvent);
 };
 engineCore.moveCamera = function moveCamera(pos) {
-  engineCore.camPos = pos;
+  camPos = pos;
 };
 engineCore.localToGlobalPos = function localToGlobal(pos) {
   return new Vec2(
-    (pos.x + engineCore.camPos.x) * renderScale,
-    (pos.y + engineCore.camPos.y) * renderScale
+    (pos.x + camPos.x) * renderScale,
+    (pos.y + camPos.y) * renderScale
   );
 };
 engineCore.localToGlobalX = function localToGlobalX(x) {
-  return (x + engineCore.camPos.x) / renderScale;
+  return (x + camPos.x) / renderScale;
 };
 engineCore.localToGlobalY = function localToGlobalY(y) {
-  return (y - engineCore.camPos.y) / renderScale;
+  return (y - camPos.y) / renderScale;
 };
 
 engineCore.draw = function draw(drawable) {
@@ -406,7 +407,7 @@ engineCore.getDrawableID = function getDrawableID() {
 };
 
 engineCore.getCamCenter = function getCamCenter() {
-  return new Vec2(engineCore.camPos.x, engineCore.camPos.y);
+  return new Vec2(camPos.x, camPos.y);
 };
 
 function inRenderFrame(pos, w, h, anchor) {
@@ -416,7 +417,7 @@ function inRenderFrame(pos, w, h, anchor) {
       math.OneDDistance(pos.x, engineCore.getCamCenter().x) >
         (canvas.width / 2 + w) / renderScale ||
       math.OneDDistance(pos.y, engineCore.getCamCenter().y) >
-        (canvas.height / 2 + h) / renderScale
+        (canvas.height / 2 + h + height) / renderScale
     ) {
       return false;
     } else {
@@ -430,7 +431,7 @@ function inRenderFrame(pos, w, h, anchor) {
         pos.y + canvas.height / 2,
         engineCore.getCamCenter().y
       ) >
-        (canvas.height / 2 + h) / renderScale
+        (canvas.height / 2 + h + height) / renderScale
     ) {
       return false;
     } else {
@@ -440,11 +441,12 @@ function inRenderFrame(pos, w, h, anchor) {
 }
 
 function frame() {
+  c.translate(0, height);
   // DRAWS A FRAME
   updatefuncs.forEach((func) => {
-    window[func]();
+    func();
   });
-  c.clearRect(0, 0, canvas.width, canvas.height);
+  c.clearRect(0, -canvas.height, canvas.width, canvas.height * 2);
   var drawablesQueue = new PriorityQueue(drawables.items);
   var length = drawablesQueue.length;
   for (var i = 0; i < length; i++) {
@@ -475,14 +477,13 @@ function frame() {
         posModifierY = -Math.round(canvas.height / 2) / renderScale;
       }
       if (item.global) {
-        modifiedX = (item.x - engineCore.camPos.x - posModifierX) * renderScale;
-        modifiedY =
-          (-item.y + engineCore.camPos.y - posModifierY) * renderScale;
+        modifiedX = (item.x - camPos.x - posModifierX) * renderScale;
+        modifiedY = (-item.y + camPos.y + posModifierY) * renderScale;
         modifiedW = item.w * renderScale;
         modifiedH = item.h * renderScale;
       } else {
         modifiedX = item.x - posModifierX;
-        modifiedY = -item.y - posModifierY;
+        modifiedY = -item.y + posModifierY;
       }
       c.globalAlpha = item.transparency;
       drawFuncs[item.type](
@@ -499,10 +500,11 @@ function frame() {
   }
   currentFrameTime = Date.now() - lastFrameTime;
   lastFrameTime = Date.now();
+  c.translate(0, -height);
   requestAnimationFrame(frame);
 }
 
-function Drawable(
+engineCore.Drawable = function Drawable(
   type,
   priority,
   id,
@@ -526,9 +528,9 @@ function Drawable(
   this.anchor = anchor;
   this.args = args;
   this.transparency = transparency;
-}
+};
 
-function Vec2(x, y) {
+export function Vec2(x, y) {
   if (y == undefined) {
     this.x = x;
     this.y = x;
@@ -580,10 +582,14 @@ function initializeFunctions() {
 
   drawFuncs.push((item, modifiedX, modifiedY, modifiedW, modifiedH, ctx) => {
     // RECT
+    ctx.translate(modifiedX, modifiedY);
+    //ctx.rotate(1);
     ctx.beginPath();
-    ctx.rect(modifiedX, modifiedY, modifiedW, modifiedH);
+    ctx.rect(0, 0, modifiedW, modifiedH);
     ctx.fillStyle = item.args;
     ctx.fill();
+    //ctx.rotate(-1);
+    ctx.translate(-modifiedX, -modifiedY);
   });
 
   drawFuncs.push((item, modifiedX, modifiedY, modifiedW, modifiedH, ctx) => {
@@ -621,14 +627,10 @@ function initializeFunctions() {
       var lineX2;
       var lineY2;
       if (item.global) {
-        lineX1 =
-          (item.args.x1 - engineCore.camPos.x - posModifierX) * renderScale;
-        lineY1 =
-          (-item.args.y1 + engineCore.camPos.y - posModifierY) * renderScale;
-        lineX2 =
-          (item.args.x2 - engineCore.camPos.x - posModifierX) * renderScale;
-        lineY2 =
-          (-item.args.y2 + engineCore.camPos.y - posModifierY) * renderScale;
+        lineX1 = (item.args.x1 - camPos.x - posModifierX) * renderScale;
+        lineY1 = (-item.args.y1 + camPos.y - posModifierY) * renderScale;
+        lineX2 = (item.args.x2 - camPos.x - posModifierX) * renderScale;
+        lineY2 = (-item.args.y2 + camPos.y - posModifierY) * renderScale;
         modifiedW = item.w * renderScale;
         modifiedH = item.h * renderScale;
       }
@@ -651,13 +653,23 @@ function initializeFunctions() {
   });
 }
 
-engineCore.resize = () => {
-  console.log(
-    "Unassigned Resize Method. Please assign it by running Density.resize = () => {// Your method }"
-  );
-};
+resizefuncs.push(() => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  width = canvas.width;
+  height = canvas.height;
+});
 
+engineCore.registerResizeEvent = function (func) {
+  resizefuncs.push(func);
+};
+engineCore.doResize = () => {
+  for (let i = 0; i < resizefuncs.length; i++) {
+    const element = resizefuncs[i];
+    element();
+  }
+};
 /* Simple Resize Check */
-window.onresize = engineCore.resize;
+window.onresize = engineCore.doResize;
 
 export default engineCore;
