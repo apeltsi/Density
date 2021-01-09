@@ -80,6 +80,7 @@ class PriorityQueue {
   }
 
   enqueue(element, priority) {
+    var returnValue;
     // creating object from queue element
     var qElement = new QElement(element, priority);
     var contain = false;
@@ -93,6 +94,7 @@ class PriorityQueue {
         // enqueued
         this.items.splice(i, 0, qElement);
         contain = true;
+        returnValue = i;
         break;
       }
     }
@@ -101,7 +103,9 @@ class PriorityQueue {
     // it is added at the end of the queue
     if (!contain) {
       this.items.push(qElement);
+      returnValue = this.items.length - 1;
     }
+    return returnValue;
   }
 
   remove(id) {
@@ -285,23 +289,19 @@ var drawables = new PriorityQueue(); // DRAWABLES OR RENDER QUEUE
 var updatefuncs = [];
 var resizefuncs = [];
 var idsInUse = [];
-var lastID = 0;
-var renderScale = 1;
-var currentZoom = 1;
-var safeRenderScales = [0.1, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+export var renderScale = 1;
 var mouseIsOverCanvas = true;
 
 var drawFuncs = []; // this array holds all of the draw funcs
 var lastFrameTime = 0;
 var currentFrameTime = 0;
-export var mouseX = 0;
-export var mouseY = 0;
+export var mouse = new Vec2(0, 0);
 export var width = canvas.width;
 export var height = canvas.height;
 export var camPos = new Vec2(0, 0);
 var mouseMoveEvent = function (event) {
-  mouseX = event.x;
-  mouseY = height - event.y;
+  mouse.x = event.x;
+  mouse.y = height - event.y;
   if (-event.y > 0) {
     mouseIsOverCanvas = false;
   } else {
@@ -311,7 +311,11 @@ var mouseMoveEvent = function (event) {
 engineCore.init = function initialize() {
   requestAnimationFrame(frame);
   initializeFunctions();
+  engineCore.doResize();
   window.addEventListener("mousemove", mouseMoveEvent);
+};
+engineCore.setRenderScale = (scale) => {
+  renderScale = scale;
 };
 engineCore.moveCamera = function moveCamera(pos) {
   camPos = pos;
@@ -329,7 +333,19 @@ engineCore.localToGlobalY = function localToGlobalY(y) {
   return (y - camPos.y) / renderScale;
 };
 
-engineCore.draw = function draw(drawable) {
+engineCore.draw = function draw(
+  drawable = {
+    type: "",
+    id: engineCore.getDrawableID(),
+    priority: 0,
+    x: 0,
+    y: 0,
+    w: 0,
+    h: 0,
+    global: true,
+    args: {},
+  }
+) {
   // ADDS A DRAWABLE TO THE RENDER QUEUE
   if (drawable == undefined) {
     console.log("ILLEGAL DRAWABLE");
@@ -338,24 +354,24 @@ engineCore.draw = function draw(drawable) {
   drawable.type = getDrawableTypeInteger(drawable.type);
 
   idsInUse[idsInUse.length] = drawable.id;
-  drawables.enqueue(drawable, drawable.priority);
-  return drawable;
+  const index = drawables.enqueue(drawable, drawable.priority);
+  return drawables.items[index].element;
 };
 
 function getDrawableTypeInteger(typestring) {
   switch (typestring) {
     case "rect":
-      return 0;
+      return 1;
     case "sprite":
-      return 1;
-    case "text":
       return 2;
-    case "line":
+    case "text":
       return 3;
-    case "circle":
+    case "line":
       return 4;
+    case "circle":
+      return 5;
     case "cluster":
-      return 1;
+      return 2;
     default:
       return 0;
   }
@@ -410,60 +426,47 @@ engineCore.getCamCenter = function getCamCenter() {
   return new Vec2(camPos.x, camPos.y);
 };
 
-function inRenderFrame(pos, w, h, anchor) {
+function inRenderFrame(pos, w, h) {
   // Culling
-  if (anchor == "center") {
-    if (
-      math.OneDDistance(pos.x, engineCore.getCamCenter().x) >
-        (canvas.width / 2 + w) / renderScale ||
-      math.OneDDistance(pos.y, engineCore.getCamCenter().y) >
-        (canvas.height / 2 + h + height) / renderScale
-    ) {
-      return false;
-    } else {
-      return true;
-    }
+
+  if (
+    math.OneDDistance(pos.x, engineCore.getCamCenter().x) >
+      (canvas.width / 2 + w) / renderScale ||
+    math.OneDDistance(pos.y, engineCore.getCamCenter().y) >
+      (canvas.height / 2 + h + height) / renderScale
+  ) {
+    return false;
   } else {
-    if (
-      math.OneDDistance(pos.x - canvas.width / 2, engineCore.getCamCenter().x) >
-        (canvas.width / 2 + w) / renderScale ||
-      math.OneDDistance(
-        pos.y + canvas.height / 2,
-        engineCore.getCamCenter().y
-      ) >
-        (canvas.height / 2 + h + height) / renderScale
-    ) {
-      return false;
-    } else {
-      return true;
-    }
+    return true;
   }
 }
 
 function frame() {
-  c.translate(0, height);
   // DRAWS A FRAME
   updatefuncs.forEach((func) => {
     func();
   });
-  c.clearRect(0, -canvas.height, canvas.width, canvas.height * 2);
+  c.clearRect(0, 0, canvas.width, canvas.height);
   var drawablesQueue = new PriorityQueue(drawables.items);
   var length = drawablesQueue.length;
   for (var i = 0; i < length; i++) {
     var item = drawablesQueue.dequeue().element.element;
+    if (item.type == 0) {
+      continue;
+    }
     if (item == undefined) {
       console.log("ILLEGAL DRAWABLE");
       requestAnimationFrame(frame);
       return;
     }
-    if (item.type == 3) {
+    if (item.type == 4) {
       item.x = (item.args.x1 + item.args.x2) / 2;
       item.y = (item.args.y1 + item.args.y2) / 2;
       item.w = Math.abs(item.args.x1 - item.args.x2);
       item.h = Math.abs(item.args.y1 - item.args.y2);
     }
     if (
-      inRenderFrame(new Vec2(item.x, item.y), item.w, item.h, item.anchor) ||
+      inRenderFrame(new Vec2(item.x, item.y), item.w, item.h) ||
       !item.global
     ) {
       var posModifierX = 0;
@@ -472,13 +475,13 @@ function frame() {
       var modifiedY = item.y;
       var modifiedW = item.w;
       var modifiedH = item.h;
-      if (item.anchor == "center") {
-        posModifierX = -Math.round(canvas.width / 2) / renderScale;
-        posModifierY = -Math.round(canvas.height / 2) / renderScale;
-      }
       if (item.global) {
-        modifiedX = (item.x - camPos.x - posModifierX) * renderScale;
-        modifiedY = (-item.y + camPos.y + posModifierY) * renderScale;
+        modifiedX =
+          (item.x - camPos.x - posModifierX - item.w / 2) * renderScale +
+          width / 2;
+        modifiedY =
+          (-item.y + camPos.y + posModifierY - item.h / 2) * renderScale +
+          height / 2;
         modifiedW = item.w * renderScale;
         modifiedH = item.h * renderScale;
       } else {
@@ -486,7 +489,7 @@ function frame() {
         modifiedY = -item.y + posModifierY;
       }
       c.globalAlpha = item.transparency;
-      drawFuncs[item.type](
+      drawFuncs[item.type - 1](
         item,
         modifiedX,
         modifiedY,
@@ -500,35 +503,8 @@ function frame() {
   }
   currentFrameTime = Date.now() - lastFrameTime;
   lastFrameTime = Date.now();
-  c.translate(0, -height);
   requestAnimationFrame(frame);
 }
-
-engineCore.Drawable = function Drawable(
-  type,
-  priority,
-  id,
-  x,
-  y,
-  w,
-  h,
-  global,
-  anchor,
-  args,
-  transparency = 1
-) {
-  this.type = type;
-  this.priority = priority;
-  this.id = id;
-  this.x = x;
-  this.y = y;
-  this.w = w;
-  this.h = h;
-  this.global = global;
-  this.anchor = anchor;
-  this.args = args;
-  this.transparency = transparency;
-};
 
 export function Vec2(x, y) {
   if (y == undefined) {
