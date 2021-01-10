@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <script>
+      function init() {
+        setInterval(() => {
+          window.parent.setUpDebugFrame();
+        }, 250);
+        return true;
+      }
+      function updateData(arg) {
+        document.getElementById("text").innerText = arg;
+      }
+    </script>
+  </head>
+  <body onload="init();">
+    <h2 id="text">NO DATA</h2>
+  </body>
+</html>

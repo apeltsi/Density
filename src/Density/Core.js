@@ -1,5 +1,4 @@
 var engineCore = {};
-
 //#region Misc Library
 // PAGE SETUP
 window.onload = function () {
@@ -277,7 +276,6 @@ math.getBoundingBox = function (points, width) {
   if (Number.isNaN(boundingBox.center.x)) {
     boundingBox.center = new Vec2(0, 0);
   }
-  console.log(boundingBox.center);
   return boundingBox;
 };
 //#endregion
@@ -285,7 +283,7 @@ math.getBoundingBox = function (points, width) {
 var canvas = document.getElementById("maincanvas");
 engineCore.canvas = canvas;
 var c = canvas.getContext("2d");
-var drawables = new PriorityQueue(); // DRAWABLES OR RENDER QUEUE
+export var engine_drawables = new PriorityQueue(); // DRAWABLES OR RENDER QUEUE
 var updatefuncs = [];
 var resizefuncs = [];
 var idsInUse = [];
@@ -293,8 +291,13 @@ export var renderScale = 1;
 var mouseIsOverCanvas = true;
 
 var drawFuncs = []; // this array holds all of the draw funcs
-var lastFrameTime = 0;
-var currentFrameTime = 0;
+export var stats = {
+  lastFrameTime: 0,
+  currentFrameTime: 0,
+  frameCount: 0,
+  startTime: 0,
+  errors: [],
+};
 export var mouse = new Vec2(0, 0);
 export var width = canvas.width;
 export var height = canvas.height;
@@ -313,6 +316,7 @@ engineCore.init = function initialize() {
   initializeFunctions();
   engineCore.doResize();
   window.addEventListener("mousemove", mouseMoveEvent);
+  stats.startTime = Date.now();
 };
 engineCore.setRenderScale = (scale) => {
   renderScale = scale;
@@ -348,14 +352,14 @@ engineCore.draw = function draw(
 ) {
   // ADDS A DRAWABLE TO THE RENDER QUEUE
   if (drawable == undefined) {
-    console.log("ILLEGAL DRAWABLE");
+    logError("ILLEGAL DRAWABLE");
     return undefined;
   }
   drawable.type = getDrawableTypeInteger(drawable.type);
 
   idsInUse[idsInUse.length] = drawable.id;
-  const index = drawables.enqueue(drawable, drawable.priority);
-  return drawables.items[index].element;
+  const index = engine_drawables.enqueue(drawable, drawable.priority);
+  return engine_drawables.items[index].element;
 };
 
 function getDrawableTypeInteger(typestring) {
@@ -378,16 +382,16 @@ function getDrawableTypeInteger(typestring) {
 }
 
 engineCore.removeDraw = function removeDraw(id) {
-  drawables.remove(id);
+  engine_drawables.remove(id);
 };
 
 engineCore.changeDraw = function changeDraw(id, newDrawable) {
   // DOESN'T CHANGE PRIORITY ONLY ITEM CONTENTS UNLESS DRAW() IS CALLED
-  var rawItem = drawables.getRaw(id);
+  var rawItem = engine_drawables.getRaw(id);
   if (rawItem == null || rawItem.element != newDrawable) {
     if (rawItem != null) {
       newDrawable.type = getDrawableTypeInteger(newDrawable.type);
-      drawables.changeRaw(id, newDrawable);
+      engine_drawables.changeRaw(id, newDrawable);
     } else {
       engineCore.draw(newDrawable);
     }
@@ -395,13 +399,13 @@ engineCore.changeDraw = function changeDraw(id, newDrawable) {
 };
 
 engineCore.moveDraw = function moveDraw(id, pos) {
-  var rawItem = drawables.getRaw(id);
+  var rawItem = engine_drawables.getRaw(id);
   if (rawItem == null || rawItem.element != newDrawable) {
     var newDrawable = rawItem.element;
     newDrawable.x = pos.x;
     newDrawable.y = pos.y;
     if (rawItem != null) {
-      drawables.changeRaw(id, newDrawable);
+      engine_drawables.changeRaw(id, newDrawable);
     } else {
       engineCore.draw(newDrawable);
     }
@@ -447,7 +451,7 @@ function frame() {
     func();
   });
   c.clearRect(0, 0, canvas.width, canvas.height);
-  var drawablesQueue = new PriorityQueue(drawables.items);
+  var drawablesQueue = new PriorityQueue(engine_drawables.items);
   var length = drawablesQueue.length;
   for (var i = 0; i < length; i++) {
     var item = drawablesQueue.dequeue().element.element;
@@ -455,7 +459,7 @@ function frame() {
       continue;
     }
     if (item == undefined) {
-      console.log("ILLEGAL DRAWABLE");
+      logError("ILLEGAL DRAWABLE");
       requestAnimationFrame(frame);
       return;
     }
@@ -501,8 +505,9 @@ function frame() {
       );
     }
   }
-  currentFrameTime = Date.now() - lastFrameTime;
-  lastFrameTime = Date.now();
+  stats.currentFrameTime = Date.now() - stats.lastFrameTime;
+  stats.lastFrameTime = Date.now();
+  stats.frameCount++;
   requestAnimationFrame(frame);
 }
 
@@ -645,6 +650,12 @@ engineCore.doResize = () => {
     element();
   }
 };
+
+function logError(str) {
+  console.logError(str);
+  stats.errors.push(str);
+}
+
 /* Simple Resize Check */
 window.onresize = engineCore.doResize;
 
