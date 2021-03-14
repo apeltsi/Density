@@ -1,4 +1,4 @@
-### Warning This repo is still very much a WIP
+### Warning This repo is still very much a WIP and is not ready for commercial use
 # Density
 ### What is it?
 Density is a web framework for drawing simple shapes and sprites for any project. But Density can be very powerful.
