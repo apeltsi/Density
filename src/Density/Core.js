@@ -174,6 +174,65 @@ class PriorityQueue {
 //#endregion
 
 //#region Math Library
+export class Vec2 {
+  constructor(x, y) {
+    if (y == undefined) {
+      this.x = x;
+      this.y = x;
+    } else {
+      this.x = x;
+      this.y = y;
+    }
+  }
+  addV(vec_) {
+    return new Vec2(this.x + vec_.x, this.y + vec_.y);
+  }
+  subV(vec_) {
+    return new Vec2(this.x - vec_.x, this.y - vec_.y);
+  }
+  dot(vec_) {
+    return this.x * vec_.x + this.y * vec_.y;
+  }
+  get length() {
+    return Math.sqrt(this.dot(this));
+  }
+  divS(value) {
+    return new Vec2(this.x / value, this.y / value);
+  }
+  mulV(vec_) {
+    return new Vec2(this.x * vec_.x, this.y * vec_.y);
+  }
+  mulS(value) {
+    return new Vec2(this.x * value, this.y * value);
+  }
+  clamp(min, max) {
+    var x = this.x;
+    var y = this.y;
+    if (this.x > max) {
+      x = max;
+    } else if (this.x < min) {
+      x = min;
+    }
+    if (this.y > max) {
+      y = max;
+    } else if (this.y < min) {
+      y = min;
+    }
+    return new Vec2(x, y);
+  }
+  magnitude() {
+    return Math.sqrt(this.x * this.x + this.y * this.y);
+  }
+
+  normalize() {
+    var m = this.magnitude();
+    return this.divS(m);
+  }
+
+  round() {
+    return new Vec2(Math.round(this.x), Math.round(this.y));
+  }
+}
 export var math = {};
 math.distance = function (avec, bvec) {
   var a = avec.x - bvec.x;
@@ -283,12 +342,46 @@ math.getBoundingBox = function (points, width) {
 var canvas = document.getElementById("maincanvas");
 engineCore.canvas = canvas;
 var c = canvas.getContext("2d");
+engineCore.ctx = c;
 export var engine_drawables = new PriorityQueue(); // DRAWABLES OR RENDER QUEUE
 var updatefuncs = [];
 var resizefuncs = [];
 var idsInUse = [];
 export var renderScale = 1;
 var mouseIsOverCanvas = true;
+window.onerror = function (error, url, line) {
+  logError(error);
+  return false;
+};
+export class Drawable {
+  constructor(args) {
+    Object.assign(this, args);
+    if (this.id == undefined) {
+      this.id = engineCore.getDrawableID();
+    }
+    if (this.priority == undefined) {
+      this.priority = 0;
+    }
+    if (this.global == undefined) {
+      this.global = true;
+    }
+    if (this.visible == undefined) {
+      this.visible = true;
+    }
+    if (this.parallaxX == undefined) {
+      this.parallaxX = 1;
+    }
+    if (this.parallaxY == undefined) {
+      this.parallaxY = 1;
+    }
+    if (this.opacity == undefined) {
+      this.opacity = 1;
+    }
+  }
+  remove() {
+    engineCore.removeDraw(this.id);
+  }
+}
 
 var drawFuncs = []; // this array holds all of the draw funcs
 export var stats = {
@@ -297,6 +390,7 @@ export var stats = {
   frameCount: 0,
   startTime: 0,
   errors: [],
+  ver: "2.0a",
 };
 export var mouse = new Vec2(0, 0);
 export var width = canvas.width;
@@ -338,48 +432,25 @@ engineCore.localToGlobalY = function localToGlobalY(y) {
 };
 
 engineCore.draw = function draw(
-  drawable = {
-    type: "",
-    id: engineCore.getDrawableID(),
-    priority: 0,
+  drawable = new Rectangle({
     x: 0,
     y: 0,
-    w: 0,
-    h: 0,
+    w: 100,
+    h: 100,
     global: true,
-    args: {},
-  }
+    color: "",
+    visible: true,
+  })
 ) {
-  // ADDS A DRAWABLE TO THE RENDER QUEUE
   if (drawable == undefined) {
     logError("ILLEGAL DRAWABLE");
     return undefined;
   }
-  drawable.type = getDrawableTypeInteger(drawable.type);
 
   idsInUse[idsInUse.length] = drawable.id;
   const index = engine_drawables.enqueue(drawable, drawable.priority);
   return engine_drawables.items[index].element;
 };
-
-function getDrawableTypeInteger(typestring) {
-  switch (typestring) {
-    case "rect":
-      return 1;
-    case "sprite":
-      return 2;
-    case "text":
-      return 3;
-    case "line":
-      return 4;
-    case "circle":
-      return 5;
-    case "cluster":
-      return 2;
-    default:
-      return 0;
-  }
-}
 
 engineCore.removeDraw = function removeDraw(id) {
   engine_drawables.remove(id);
@@ -389,21 +460,6 @@ engineCore.changeDraw = function changeDraw(id, newDrawable) {
   // DOESN'T CHANGE PRIORITY ONLY ITEM CONTENTS UNLESS DRAW() IS CALLED
   var rawItem = engine_drawables.getRaw(id);
   if (rawItem == null || rawItem.element != newDrawable) {
-    if (rawItem != null) {
-      newDrawable.type = getDrawableTypeInteger(newDrawable.type);
-      engine_drawables.changeRaw(id, newDrawable);
-    } else {
-      engineCore.draw(newDrawable);
-    }
-  }
-};
-
-engineCore.moveDraw = function moveDraw(id, pos) {
-  var rawItem = engine_drawables.getRaw(id);
-  if (rawItem == null || rawItem.element != newDrawable) {
-    var newDrawable = rawItem.element;
-    newDrawable.x = pos.x;
-    newDrawable.y = pos.y;
     if (rawItem != null) {
       engine_drawables.changeRaw(id, newDrawable);
     } else {
@@ -455,45 +511,40 @@ function frame() {
   var length = drawablesQueue.length;
   for (var i = 0; i < length; i++) {
     var item = drawablesQueue.dequeue().element.element;
-    if (item.type == 0) {
-      continue;
-    }
     if (item == undefined) {
       logError("ILLEGAL DRAWABLE");
       requestAnimationFrame(frame);
       return;
     }
-    if (item.type == 4) {
-      item.x = (item.args.x1 + item.args.x2) / 2;
-      item.y = (item.args.y1 + item.args.y2) / 2;
-      item.w = Math.abs(item.args.x1 - item.args.x2);
-      item.h = Math.abs(item.args.y1 - item.args.y2);
+    if (!item.visible) {
+      continue;
     }
-    if (
-      inRenderFrame(new Vec2(item.x, item.y), item.w, item.h) ||
-      !item.global
-    ) {
+    if (inRenderFrame(item.pos, item.scale.x, item.scale.y) || !item.global) {
       var posModifierX = 0;
       var posModifierY = 0;
-      var modifiedX = item.x;
-      var modifiedY = item.y;
-      var modifiedW = item.w;
-      var modifiedH = item.h;
+      var modifiedX = item.pos.x;
+      var modifiedY = item.pos.y;
+      var modifiedW = item.scale.x;
+      var modifiedH = item.scale.y;
       if (item.global) {
         modifiedX =
-          (item.x - camPos.x - posModifierX - item.w / 2) * renderScale +
+          (item.pos.x - camPos.x - posModifierX - item.scale.x / 2) *
+            renderScale *
+            item.parallaxX +
           width / 2;
         modifiedY =
-          (-item.y + camPos.y + posModifierY - item.h / 2) * renderScale +
+          (-item.pos.y + camPos.y + posModifierY - item.scale.y / 2) *
+            renderScale *
+            item.parallaxY +
           height / 2;
-        modifiedW = item.w * renderScale;
-        modifiedH = item.h * renderScale;
+        modifiedW = item.scale.x * renderScale;
+        modifiedH = item.scale.y * renderScale;
       } else {
-        modifiedX = item.x - posModifierX;
-        modifiedY = -item.y + posModifierY;
+        modifiedX = item.pos.x - posModifierX;
+        modifiedY = -item.pos.y + posModifierY;
       }
-      c.globalAlpha = item.transparency;
-      drawFuncs[item.type - 1](
+      c.globalAlpha = item.opacity;
+      item.render(
         item,
         modifiedX,
         modifiedY,
@@ -503,6 +554,7 @@ function frame() {
         posModifierX,
         posModifierY
       );
+      c.globalAlpha = 1;
     }
   }
   stats.currentFrameTime = Date.now() - stats.lastFrameTime;
@@ -511,85 +563,63 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
-export function Vec2(x, y) {
-  if (y == undefined) {
-    this.x = x;
-    this.y = x;
-  } else {
-    this.x = x;
-    this.y = y;
-  }
-
-  this.addV = function (vec_) {
-    return new Vec2(this.x + vec_.x, this.y + vec_.y);
-  };
-  this.subV = function (vec_) {
-    return new Vec2(this.x - vec_.x, this.y - vec_.y);
-  };
-  this.dot = function (vec_) {
-    return this.x * vec_.x + this.y * vec_.y;
-  };
-  this.length = function () {
-    return Math.sqrt(this.dot(this));
-  };
-  this.divS = function (value) {
-    return new Vec2(this.x / value, this.y / value);
-  };
-  this.mulV = function (vec_) {
-    return new Vec2(this.x * vec_.x, this.y * vec_.y);
-  };
-  this.mulS = function (value) {
-    return new Vec2(this.x * value, this.y * value);
-  };
-  this.clamp = function (min, max) {
-    var x = this.x;
-    var y = this.y;
-    if (this.x > max) {
-      x = max;
-    } else if (this.x < min) {
-      x = min;
-    }
-    if (this.y > max) {
-      y = max;
-    } else if (this.y < min) {
-      y = min;
-    }
-    return new Vec2(x, y);
-  };
-}
-
-function initializeFunctions() {
-  // Draw funcs. NOTE: Some density plugins like Density-Particles will add the function on their own!
-
-  drawFuncs.push((item, modifiedX, modifiedY, modifiedW, modifiedH, ctx) => {
-    // RECT
+export class Rectangle extends Drawable {
+  render(item, modifiedX, modifiedY, modifiedW, modifiedH, ctx) {
     ctx.translate(modifiedX, modifiedY);
     //ctx.rotate(1);
     ctx.beginPath();
     ctx.rect(0, 0, modifiedW, modifiedH);
-    ctx.fillStyle = item.args;
+    ctx.fillStyle = item.color;
     ctx.fill();
     //ctx.rotate(-1);
     ctx.translate(-modifiedX, -modifiedY);
-  });
+  }
+}
 
-  drawFuncs.push((item, modifiedX, modifiedY, modifiedW, modifiedH, ctx) => {
-    // SPRITE
-    ctx.drawImage(item.args, modifiedX, modifiedY, modifiedW, modifiedH);
-  });
+export class Sprite extends Drawable {
+  render(item, modifiedX, modifiedY, modifiedW, modifiedH, ctx) {
+    if (item.image == undefined) {
+      return;
+    }
+    ctx.drawImage(item.image, modifiedX, modifiedY, modifiedW, modifiedH);
+  }
+}
 
-  drawFuncs.push((item, modifiedX, modifiedY, modifiedW, modifiedH, ctx) => {
-    // TEXT
+export class Text extends Drawable {
+  render(item, modifiedX, modifiedY, modifiedW, modifiedH, ctx) {
     var scale = 1;
     if (item.global) {
       scale = renderScale;
     }
-    ctx.font = "bold " + 30 * scale + "px Arial";
-    ctx.textAlign = item.args.align;
+    if (item.font != undefined) {
+      ctx.font = item.font;
+    } else {
+      ctx.font = "bold " + 30 * scale + "px Arial";
+    }
+    ctx.textAlign = item.align;
     ctx.textBaseline = "middle";
-    ctx.fillStyle = item.args.color;
-    ctx.fillText(item.args.text, modifiedX, modifiedY);
-  });
+    if (item.outline != undefined) {
+      ctx.fillStyle = item.outline.color;
+      ctx.lineWidth = item.outline.width;
+      ctx.strokeText(item.text, modifiedX, modifiedY);
+    }
+    ctx.fillStyle = item.color;
+
+    ctx.fillText(item.text, modifiedX, modifiedY);
+  }
+}
+
+export class Circle extends Drawable {
+  render(item, modifiedX, modifiedY, modifiedW, modifiedH, ctx) {
+    ctx.beginPath();
+    ctx.arc(modifiedX, modifiedY, modifiedW, 0, 2 * Math.PI);
+    ctx.fillStyle = item.args;
+    ctx.fill();
+  }
+}
+
+function initializeFunctions() {
+  // Draw funcs. NOTE: Some density plugins like Density-Particles will add the function on their own!
 
   drawFuncs.push(
     (
@@ -612,8 +642,8 @@ function initializeFunctions() {
         lineY1 = (-item.args.y1 + camPos.y - posModifierY) * renderScale;
         lineX2 = (item.args.x2 - camPos.x - posModifierX) * renderScale;
         lineY2 = (-item.args.y2 + camPos.y - posModifierY) * renderScale;
-        modifiedW = item.w * renderScale;
-        modifiedH = item.h * renderScale;
+        modifiedW = item.scale.x * renderScale;
+        modifiedH = item.scale.y * renderScale;
       }
       ctx.strokeStyle = item.args.color;
       ctx.beginPath();
@@ -624,14 +654,6 @@ function initializeFunctions() {
       ctx.stroke();
     }
   );
-
-  drawFuncs.push((item, modifiedX, modifiedY, modifiedW, modifiedH, ctx) => {
-    // SPRITE
-    ctx.beginPath();
-    ctx.arc(modifiedX, modifiedY, modifiedW, 0, 2 * Math.PI);
-    ctx.fillStyle = item.args;
-    ctx.fill();
-  });
 }
 
 resizefuncs.push(() => {
@@ -652,11 +674,14 @@ engineCore.doResize = () => {
 };
 
 function logError(str) {
-  console.logError(str);
+  console.error(str);
   stats.errors.push(str);
 }
 
 /* Simple Resize Check */
 window.onresize = engineCore.doResize;
+export const sleep = (milliseconds) => {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+};
 
 export default engineCore;

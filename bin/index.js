@@ -1,17 +1,41 @@
-console.log("Starting Density Builder...");
+#!/usr/bin/env node
 const minify = require("minify");
 const child_process = require("child_process");
 const portfinder = require("portfinder");
+const readline = require("readline");
 const fs = require("fs");
 const path = require("path");
-const startTime = Date.now();
-const settings = require("./src/density.json");
+const chokidar = require("chokidar");
+var startTime = Date.now();
+const settings = require(process.cwd() + "/src/density.json");
+console.log("Starting Density Builder...");
 var childProcess;
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
 var runArgs = {};
+console.log("Watching folder " + path.join(process.cwd() + "/src"));
+chokidar.watch(path.join(process.cwd() + "/src")).on("all", (event, path) => {
+  if (Date.now() - startTime > 500) {
+    runArgs.buildAndRun = false;
+    startTime = Date.now();
+    runBuild();
+  }
+});
+rl.on("line", function (input) {
+  if (input == "r" || input == "reload") {
+    runArgs.buildAndRun = false;
+    startTime = Date.now();
+    runBuild();
+  }
+});
 for (let i = 2; i < process.argv.length; i++) {
   const element = process.argv[i];
   if (element == "buildandrun" || element == "br" || element == "run") {
     runArgs.buildAndRun = true;
+  } else if (element == "dev" || element == "d") {
+    runArgs.dev = true;
   }
 }
 const options = {
@@ -31,10 +55,10 @@ var walkSync = function (dir) {
   files.forEach(function (file) {
     if (fs.statSync(dir + file).isDirectory()) {
       fs.mkdirSync(
-        __dirname +
+        process.cwd() +
           "/build" +
           (dir + file).substring(
-            (__dirname + "/src").length,
+            (process.cwd() + "/src").length,
             (dir + file).length
           )
       );
@@ -42,10 +66,10 @@ var walkSync = function (dir) {
     } else if (file != "density.json" && file != ".gitignore") {
       fs.copyFileSync(
         dir + file,
-        __dirname +
+        process.cwd() +
           "/build" +
           (dir + file).substring(
-            (__dirname + "/src").length,
+            (process.cwd() + "/src").length,
             (dir + file).length
           )
       );
@@ -54,16 +78,26 @@ var walkSync = function (dir) {
         const type = file.split(".")[file.split(".").length - 1];
         if (type == "js" || type == "html" || type == "htm" || type == "css") {
           // MINIFY
+          const t = new Date();
+          const date = ("0" + t.getDate()).slice(-2);
+          const month = ("0" + (t.getMonth() + 1)).slice(-2);
+          const year = t.getFullYear();
+          const hours = ("0" + t.getHours()).slice(-2);
+          const minutes = ("0" + t.getMinutes()).slice(-2);
+          const seconds = ("0" + t.getSeconds()).slice(-2);
+          const time = `${date}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
           minify(dir + file, options)
             .then(async (min) => {
               fs.writeFile(
-                __dirname +
+                process.cwd() +
                   "/build" +
                   (dir + file).substring(
-                    (__dirname + "/src").length,
+                    (process.cwd() + "/src").length,
                     (dir + file).length
                   ),
-                min,
+                min
+                  .replace(/BUILD_DATE/g, time)
+                  .replace(/BUILD_NUMBER/g, settings.buildNumber),
                 (err) => {}
               );
             })
@@ -73,20 +107,46 @@ var walkSync = function (dir) {
     }
   });
 };
-var dir = __dirname + "/build";
-if (!fs.existsSync(dir)) {
-  fs.mkdirSync(dir, 0744);
+runBuild();
+function runBuild() {
+  if (settings.buildNumber == undefined) {
+    settings.buildNumber = 0;
+  }
+  settings.buildNumber += 1;
+  fs.writeFile(
+    process.cwd() + "/src/density.json",
+    JSON.stringify(settings),
+    () => {}
+  );
+  if (runArgs.dev == true) {
+    // Dev mode
+    var dir = process.cwd() + "/tmp";
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, 0744);
 
-  build();
-} else {
-  fs.rmdirSync(dir, { recursive: true });
-  fs.mkdirSync(dir, 0744);
+      build();
+    } else {
+      fs.rmdirSync(dir, { recursive: true });
+      fs.mkdirSync(dir, 0744);
 
-  build();
+      build();
+    }
+  } else {
+    var dir = process.cwd() + "/build";
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, 0744);
+
+      build();
+    } else {
+      fs.rmdirSync(dir, { recursive: true });
+      fs.mkdirSync(dir, 0744);
+
+      build();
+    }
+  }
 }
-
 async function build() {
-  var dir = __dirname + "/src";
+  var dir = process.cwd() + "/src";
   console.log("Building Project...");
   walkSync(dir);
   console.log(
@@ -103,7 +163,9 @@ async function build() {
 async function startServer() {
   var port = await portfinder.getPortPromise();
 
-  var child = child_process.exec("node devServer.js " + port);
+  var child = child_process.exec(
+    "node " + path.join(__dirname + "/../devServer.js") + " " + port
+  );
   child.stdout.on("data", function (data) {
     if (data.includes("Now listening on")) {
       console.log(

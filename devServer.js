@@ -1,10 +1,10 @@
 var args = process.argv.slice(2);
 const express = require("express");
 const open = require("open");
-
 const app = express();
 const port = parseInt(args[0]);
 const development = args[1];
+
 if (port == undefined) {
   process.exit(1);
 }

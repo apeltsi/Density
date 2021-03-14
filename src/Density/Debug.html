@@ -3,8 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>Debugger</title>
     <script>
+      var lastError = 0;
+
       function init() {
         setInterval(() => {
           window.parent.setUpDebugFrame();
@@ -12,11 +14,80 @@
         return true;
       }
       function updateData(arg) {
-        document.getElementById("text").innerText = arg;
+        var stats = JSON.parse(arg);
+        if (stats.errorCount > lastError) {
+          document.body.classList.add("error");
+          lastError = stats.errorCount;
+          setTimeout(() => {
+            document.body.classList.remove("error");
+          }, 750);
+        }
+        document.getElementById("text").innerText = "Debug";
+        document.getElementById("fps").innerText = "FPS: " + stats.fps;
+        document.getElementById("avgfps").innerText =
+          "Avg. FPS: " + stats.avgfps;
+        document.getElementById("frames").innerText = "Frames: " + stats.frames;
+        document.getElementById("drawables").innerText =
+          "Drawables: " + stats.drawablecount;
+        document.getElementById("errors").innerText =
+          "Errors: " + stats.errorCount;
+        document.getElementById("runtime").innerText =
+          "Runtime: " + stats.runTime + "ms";
+        document.getElementById("version").innerText =
+          "Engine Version: " + stats.version;
       }
     </script>
+    <style type="text/css">
+      body {
+        background-color: rgba(0, 0, 0, 0.75);
+        font-family: Arial, Helvetica, sans-serif;
+        color: white;
+      }
+      h2 {
+        text-align: center;
+      }
+      body.error h3 {
+        color: darkred;
+      }
+      body.error {
+        animation-name: error;
+        animation-duration: 0.75s;
+      }
+      @keyframes error {
+        0% {
+          background-color: rgba(255, 255, 255, 0.75);
+        }
+        10% {
+          background-color: rgba(255, 0, 0, 0.75);
+        }
+        50% {
+          background-color: rgba(255, 0, 0, 0.75);
+        }
+        100% {
+          background-color: rgba(255, 255, 255, 0.75);
+        }
+      }
+      input {
+        border: none;
+        background-color: rgba(0, 0, 0, 0.75);
+        padding: 5px;
+        color: white;
+      }
+    </style>
   </head>
   <body onload="init();">
-    <h2 id="text">NO DATA</h2>
+    <div id="stats">
+      <h2 id="text">Waiting for Density...</h2>
+      <h3 id="fps"></h3>
+      <h3 id="avgfps"></h3>
+      <h3 id="frames"></h3>
+      <h3 id="drawables"></h3>
+      <h3 id="errors"></h3>
+      <h3 id="runtime"></h3>
+      <h3 id="version"></h3>
+      <form id="commandForm">
+        <input type="text" placeholder="Command..." id="commandInput" />
+      </form>
+    </div>
   </body>
 </html>

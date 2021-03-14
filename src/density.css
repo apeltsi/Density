@@ -57,3 +57,10 @@ canvas {
     opacity: 100%;
   }
 }
+
+iframe {
+  height: 400px;
+  width: 350px;
+  border: none;
+  border-radius: 15px;
+}
