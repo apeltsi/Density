@@ -1,21 +1,11 @@
 {
-  "name": "density-cli",
+  "name": "densits",
   "version": "1.0.0",
   "description": "",
-  "main": "bin/index.js",
+  "main": "Core.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "apeltsi",
-  "license": "ISC",
-  "dependencies": {
-    "chokidar": "^3.5.1",
-    "express": "^4.17.1",
-    "minify": "^6.0.1",
-    "open": "^7.3.1",
-    "portfinder": "^1.0.28"
-  },
-  "bin": {
-    "density-builder": "./bin/index.js"
-  }
+  "author": "Amos Peltonen",
+  "license": "ISC"
 }
