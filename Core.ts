@@ -1,20 +1,7 @@
 import { PriorityQueue, QElement } from "./PriorityQueue";
 import math, { Vec2 } from "./Math";
 export { math, Vec2 };
-// THIS SCRIPT HANDLES THE RENDERING SYSTEM
-let canvas: HTMLCanvasElement;
-let c: CanvasRenderingContext2D;
-export let engine_entities = new PriorityQueue(); // ENTITIES OR RENDER QUEUE
-let updatefuncs: (() => void)[] = [];
-let resizefuncs: (() => void)[] = [];
-let idsInUse: any[] = [];
-export let renderScale = 1;
-let doCulling = true;
-let mouseIsOverCanvas = true;
-window.onerror = function (error: any, url: any, line: any) {
-  logError(error);
-  return false;
-};
+
 export interface EntityProps {
   id: any;
   priority: number;
@@ -23,7 +10,11 @@ export interface EntityProps {
   global: boolean;
   visible: boolean;
   parallax: Vec2;
-  opacity: number;
+  renderer: Density;
+}
+export enum FrameMode {
+  Browser,
+  Manual,
 }
 export class Entity {
   id: any;
@@ -34,12 +25,10 @@ export class Entity {
   visible: boolean;
   parallax: Vec2;
   opacity: number;
+  renderer: Density;
 
   constructor(args: EntityProps) {
     Object.assign(this, args);
-    if (this.id == undefined) {
-      this.id = engineCore.getEntityID();
-    }
     if (this.priority == undefined) {
       this.priority = 0;
     }
@@ -57,7 +46,7 @@ export class Entity {
     }
   }
   remove() {
-    engineCore.removeDraw(this.id);
+    this.renderer.removeDraw(this.id);
   }
 }
 
@@ -66,104 +55,223 @@ interface Stats {
   currentFrameTime: number;
   frameCount: number;
   startTime: number;
-  errors: any[];
   ver: String;
 }
-export let stats: Stats = {
-  lastFrameTime: 0,
-  currentFrameTime: 0,
-  frameCount: 0,
-  startTime: 0,
-  errors: [],
-  ver: "3.0",
-};
-export let mouse = new Vec2(0, 0);
-export let width: number;
-export let height: number;
-export let camPos = new Vec2(0, 0);
-let canvasOffset: Vec2 = new Vec2(0, 0);
-let mouseMoveEvent = function (event: MouseEvent) {
-  mouse.x = event.x - canvasOffset.x;
-  mouse.y = height - (event.y - canvasOffset.y);
-  if (-event.y > 0) {
-    mouseIsOverCanvas = false;
-  } else {
-    mouseIsOverCanvas = true;
-  }
+interface settings {
+  doCulling: boolean;
+  frameMode: FrameMode;
+}
+export const sleep = (milliseconds: number) => {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 };
 
-function inRenderFrame(pos: Vec2, w: number, h: number) {
-  // Culling
-  if (!doCulling) {
-    return true;
-  }
-  if (
-    math.OneDDistance(pos.x, engineCore.getCamCenter().x) >
-      (canvas.width / 2 + w) / renderScale ||
-    math.OneDDistance(pos.y, engineCore.getCamCenter().y) >
-      (canvas.height / 2 + h + height) / renderScale
+// THIS SCRIPT HANDLES THE RENDERING SYSTEM
+export class Density {
+  canvas: HTMLCanvasElement;
+  c: CanvasRenderingContext2D;
+  engine_entities = new PriorityQueue(); // ENTITIES OR RENDER QUEUE
+
+  updatefuncs: (() => void)[] = [];
+  resizefuncs: (() => void)[] = [];
+  idsInUse: any[] = [];
+  renderScale = 1;
+  doCulling = true;
+  frameMode = FrameMode.Manual;
+  constructor(
+    settings: settings = <settings>{
+      doCulling: true,
+      frameMode: FrameMode.Browser,
+    }
   ) {
-    return false;
-  } else {
-    return true;
-  }
-}
+    this.doCulling = settings.doCulling;
+    this.frameMode = settings.frameMode;
+    if (document.getElementsByTagName("canvas").length == 0) {
+      this.canvas = document.createElement("canvas");
+      this.canvas.style.minHeight = "1px";
+      this.canvas.style.minWidth = "1px";
 
-function frame() {
-  // DRAWS A FRAME
-  updatefuncs.forEach((func: () => void) => {
-    func();
-  });
-  c.clearRect(0, 0, canvas.width, canvas.height);
-  let entitiesQueue = new PriorityQueue(engine_entities.items);
-  let length = entitiesQueue.length;
-  for (let i = 0; i < length; i++) {
-    let item = entitiesQueue.dequeue().element.element;
-    if (item == undefined) {
-      logError("ILLEGAL ENTITY");
-      requestAnimationFrame(frame);
-      return;
+      document.body.appendChild(this.canvas);
+      this.canvas = this.canvas;
+      this.c = this.canvas.getContext("2d");
+      console.log(
+        "Density couldn't find a canvas. Creating and appending a new one."
+      );
     }
-    if (!item.visible) {
-      continue;
+    if (this.frameMode == FrameMode.Browser) {
+      requestAnimationFrame(() => this.frame());
     }
-    if (inRenderFrame(item.pos, item.scale.x, item.scale.y) || !item.global) {
-      let posModifierX = 0;
-      let posModifierY = 0;
-      let modifiedX = item.pos.x;
-      let modifiedY = item.pos.y;
-      let modifiedW = item.scale.x;
-      let modifiedH = item.scale.y;
-      if (item.global) {
-        modifiedX =
-          (item.pos.x - camPos.x - posModifierX - item.scale.x / 2) *
-            renderScale *
-            item.parallax.x +
-          width / 2;
-        modifiedY =
-          (-item.pos.y + camPos.y + posModifierY - item.scale.y / 2) *
-            renderScale *
-            item.parallax.y +
-          height / 2;
-        modifiedW = item.scale.x * renderScale;
-        modifiedH = item.scale.y * renderScale;
-      } else {
-        modifiedX = item.pos.x - posModifierX;
-        modifiedY = -item.pos.y + posModifierY;
+    this.doResize(this);
+    this.stats.startTime = Date.now();
+    this.resizefuncs.push(function resize() {
+      this.canvas.width = this.canvas.clientWidth;
+      this.canvas.height = this.canvas.clientHeight;
+      this.width = this.canvas.width;
+      this.height = this.canvas.height;
+      this.canvasOffset = new Vec2(
+        this.canvas.getBoundingClientRect().left,
+        this.canvas.getBoundingClientRect().top
+      );
+    });
+    window.onresize = () => this.doResize(this);
+  }
+
+  stats: Stats = {
+    lastFrameTime: 0,
+    currentFrameTime: 0,
+    frameCount: 0,
+    startTime: 0,
+    ver: "3.0",
+  };
+  width: number;
+  height: number;
+  camPos = new Vec2(0, 0);
+  canvasOffset: Vec2 = new Vec2(0, 0);
+
+  inRenderFrame(pos: Vec2, w: number, h: number) {
+    // Culling
+    if (!this.doCulling) {
+      return true;
+    }
+    if (
+      math.OneDDistance(pos.x, this.getCamCenter().x) >
+        (this.canvas.width / 2 + w) / this.renderScale ||
+      math.OneDDistance(pos.y, this.getCamCenter().y) >
+        (this.canvas.height / 2 + h + this.height) / this.renderScale
+    ) {
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+  frame() {
+    // DRAWS A FRAME
+    this.updatefuncs.forEach((func: () => void) => {
+      func();
+    });
+    this.c.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    let entitiesQueue = new PriorityQueue(this.engine_entities.items);
+    let length = entitiesQueue.length;
+    for (let i = 0; i < length; i++) {
+      let item = entitiesQueue.dequeue().element.element;
+      if (item == undefined) {
+        console.error("ILLEGAL ENTITY");
+        if (this.frameMode == FrameMode.Browser) {
+          requestAnimationFrame(() => this.frame());
+        }
+        return;
       }
-      c.globalAlpha = item.opacity;
-      c.translate(modifiedX, modifiedY);
-      item.render(item, modifiedW, modifiedH, c);
-      c.translate(-modifiedX, -modifiedY);
-
-      c.globalAlpha = 1;
+      if (!item.visible) {
+        continue;
+      }
+      if (
+        this.inRenderFrame(item.pos, item.scale.x, item.scale.y) ||
+        !item.global
+      ) {
+        let posModifierX = 0;
+        let posModifierY = 0;
+        let modifiedX = item.pos.x;
+        let modifiedY = item.pos.y;
+        let modifiedW = item.scale.x;
+        let modifiedH = item.scale.y;
+        if (item.global) {
+          modifiedX =
+            (item.pos.x - this.camPos.x - posModifierX - item.scale.x / 2) *
+              this.renderScale *
+              item.parallax.x +
+            this.width / 2;
+          modifiedY =
+            (-item.pos.y + this.camPos.y + posModifierY - item.scale.y / 2) *
+              this.renderScale *
+              item.parallax.y +
+            this.height / 2;
+          modifiedW = item.scale.x * this.renderScale;
+          modifiedH = item.scale.y * this.renderScale;
+        } else {
+          modifiedX = item.pos.x - posModifierX;
+          modifiedY = -item.pos.y + posModifierY;
+        }
+        this.c.translate(modifiedX, modifiedY);
+        item.render(item, modifiedW, modifiedH, this.c);
+        this.c.translate(-modifiedX, -modifiedY);
+      }
+    }
+    this.stats.currentFrameTime = Date.now() - this.stats.lastFrameTime;
+    this.stats.lastFrameTime = Date.now();
+    this.stats.frameCount++;
+    if (this.frameMode == FrameMode.Browser) {
+      requestAnimationFrame(() => this.frame());
     }
   }
-  stats.currentFrameTime = Date.now() - stats.lastFrameTime;
-  stats.lastFrameTime = Date.now();
-  stats.frameCount++;
-  requestAnimationFrame(frame);
+  setRenderScale(scale: number) {
+    this.renderScale = scale;
+  }
+  moveCamera(pos: Vec2) {
+    this.camPos = pos;
+  }
+  localToGlobal(pos: Vec2) {
+    return new Vec2(
+      (pos.x + this.camPos.x - this.width / 2) / this.renderScale,
+      (pos.y + this.camPos.y - this.height / 2) / this.renderScale
+    );
+  }
+  draw(
+    entity: Entity = new Rectangle(<RectangleProps>{
+      pos: new Vec2(0, 0),
+      scale: new Vec2(100, 100),
+      global: true,
+      color: "",
+      visible: true,
+    })
+  ) {
+    if (entity == undefined) {
+      console.error("ILLEGAL ENTITY");
+      return undefined;
+    }
+    if (entity.id == undefined) {
+      entity.id = this.getEntityID();
+    }
+    entity.renderer = this;
+    this.idsInUse[this.idsInUse.length] = entity.id;
+    const index = this.engine_entities.enqueue(entity, entity.priority);
+    return this.engine_entities.items[index].element;
+  }
+  removeDraw(id: number) {
+    this.engine_entities.remove(id);
+  }
+  changeDraw(id: any, newEntity: Entity) {
+    // REPLACES THE DRAWABLE
+    this.removeDraw(id);
+    return this.draw(newEntity);
+  }
+  getEntityID() {
+    let id = Math.round(Math.random() * Number.MAX_SAFE_INTEGER);
+    for (let i = 0; i < this.idsInUse.length; i++) {
+      if (this.idsInUse[i] == id) {
+        // THIS CHECK IS ACTUALLY VERY STUPID, BUT IS DONE FOR CONSISTENCY IN THE CODE(ALSO TO PREVENT MY ANXIETY)
+        id = Math.round(Math.random() * Number.MAX_SAFE_INTEGER);
+      }
+    }
+    return id;
+  }
+  getCamCenter() {
+    return new Vec2(this.camPos.x, this.camPos.y);
+  }
+  registerUpdateEvent(func: () => void) {
+    this.updatefuncs[this.updatefuncs.length] = func;
+  }
+  doResize(renderer: Density) {
+    for (let i = 0; i < renderer.resizefuncs.length; i++) {
+      const element = renderer.resizefuncs[i];
+      element();
+    }
+  }
+  registerResizeEvent(func: () => void) {
+    this.resizefuncs.push(func);
+  }
 }
+
+// Default Entity Prototypes
 export interface Outline {
   color: string;
   width: number;
@@ -195,7 +303,7 @@ export class Rectangle extends Entity {
     ctx.fill();
     if (item.stroke) {
       ctx.strokeStyle = item.stroke.color;
-      ctx.lineWidth = item.stroke.width * renderScale;
+      ctx.lineWidth = item.stroke.width * this.renderer.renderScale;
       ctx.stroke();
     }
     //ctx.rotate(-1);
@@ -253,7 +361,7 @@ export class Text extends Entity {
   ) {
     let scale = 1;
     if (item.global) {
-      scale = renderScale;
+      scale = this.renderer.renderScale;
     }
     if (item.font != undefined) {
       ctx.font = item.font;
@@ -294,116 +402,3 @@ export class Circle extends Entity {
     ctx.fill();
   }
 }
-
-resizefuncs.push(function resize() {
-  canvas.width = canvas.clientWidth;
-  canvas.height = canvas.clientHeight;
-  width = canvas.width;
-  height = canvas.height;
-  canvasOffset = new Vec2(
-    canvas.getBoundingClientRect().left,
-    canvas.getBoundingClientRect().top
-  );
-});
-
-function logError(str: String) {
-  console.error(str);
-  stats.errors.push(str);
-}
-
-/* Simple Resize Check */
-export const sleep = (milliseconds: number) => {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
-};
-interface settings {
-  doCulling: boolean;
-}
-const engineCore = {
-  canvas: canvas,
-  ctx: c,
-  init: function initialize(settings = { doCulling: true }) {
-    doCulling = settings.doCulling;
-    if (document.getElementsByTagName("canvas").length == 0) {
-      canvas = document.createElement("canvas");
-      canvas.style.minHeight = "1px";
-      canvas.style.minWidth = "1px";
-
-      document.body.appendChild(canvas);
-      engineCore.canvas = canvas;
-      c = canvas.getContext("2d");
-      console.log(
-        "Density couldn't find a canvas. Creating and appending a new one."
-      );
-    }
-    requestAnimationFrame(frame);
-    engineCore.doResize();
-    canvas.addEventListener("mousemove", mouseMoveEvent);
-    stats.startTime = Date.now();
-  },
-  setRenderScale: (scale: number) => {
-    renderScale = scale;
-  },
-  moveCamera: function moveCamera(pos: Vec2) {
-    camPos = pos;
-  },
-  localToGlobalPos: function localToGlobal(pos: Vec2) {
-    return new Vec2(
-      (pos.x + camPos.x - width / 2) / renderScale,
-      (pos.y + camPos.y - height / 2) / renderScale
-    );
-  },
-  draw: function draw(
-    entity: Entity = new Rectangle(<RectangleProps>{
-      pos: new Vec2(0, 0),
-      scale: new Vec2(100, 100),
-      global: true,
-      color: "",
-      visible: true,
-    })
-  ) {
-    if (entity == undefined) {
-      logError("ILLEGAL ENTITY");
-      return undefined;
-    }
-
-    idsInUse[idsInUse.length] = entity.id;
-    const index = engine_entities.enqueue(entity, entity.priority);
-    return engine_entities.items[index].element;
-  },
-  removeDraw: function removeDraw(id: number) {
-    engine_entities.remove(id);
-  },
-  changeDraw: function changeDraw(id: any, newEntity: Entity) {
-    // REPLACES THE DRAWABLE
-    engineCore.removeDraw(id);
-    return engineCore.draw(newEntity);
-  },
-  getEntityID: function getEntityID() {
-    let id = Math.round(Math.random() * Number.MAX_SAFE_INTEGER);
-    for (let i = 0; i < idsInUse.length; i++) {
-      if (idsInUse[i] == id) {
-        // THIS CHECK IS ACTUALLY VERY STUPID, BUT IS DONE FOR CONSISTENCY IN THE CODE(ALSO TO PREVENT MY ANXIETY)
-        id = Math.round(Math.random() * Number.MAX_SAFE_INTEGER);
-      }
-    }
-    return id;
-  },
-  getCamCenter: function getCamCenter() {
-    return new Vec2(camPos.x, camPos.y);
-  },
-  registerUpdateEvent: function registerUpdateEvent(func: () => void) {
-    updatefuncs[updatefuncs.length] = func;
-  },
-  doResize: function () {
-    for (let i = 0; i < resizefuncs.length; i++) {
-      const element = resizefuncs[i];
-      element();
-    }
-  },
-  registerResizeEvent: function (func: () => void) {
-    resizefuncs.push(func);
-  },
-};
-window.onresize = engineCore.doResize;
-window.onscroll = engineCore.doResize;
-export default engineCore;
