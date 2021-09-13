@@ -3,29 +3,28 @@ import math, { Vec2 } from "./Math";
 export { math, Vec2 };
 
 export interface EntityProps {
-  id: any;
-  priority: number;
-  pos: Vec2;
-  scale: Vec2;
-  global: boolean;
-  visible: boolean;
-  parallax: Vec2;
-  renderer: Density;
+  id: any; // Unique ID for every entity
+  priority: number; // What layer should entity be rendered on higher = rendered later
+  pos: Vec2; // Global position. 0 0 = center of screen
+  scale: Vec2; // Global scale of entity
+  global: boolean; // Should entity use local or global coordinate system
+  visible: boolean; // Should object be rendered?
+  parallax: Vec2; // Should parallax be used?
+  renderer: Density; // What instance is rendering this entity?
 }
 export enum FrameMode {
-  Browser,
-  Manual,
+  Browser, // Render frame on requestAnimationFrame
+  Manual, // Render frame when requested
 }
 export class Entity {
-  id: any;
-  priority: number;
-  pos: Vec2;
-  scale: Vec2;
-  global: boolean;
-  visible: boolean;
-  parallax: Vec2;
-  opacity: number;
-  renderer: Density;
+  id: any; // Unique ID for every entity
+  priority: number; // What layer should entity be rendered on higher = rendered later
+  pos: Vec2; // Global position. 0 0 = center of screen
+  scale: Vec2; // Global scale of entity
+  global: boolean; // Should entity use local or global coordinate system
+  visible: boolean; // Should object be rendered?
+  parallax: Vec2; // Should parallax be used?
+  renderer: Density; // What instance is rendering this entity?
 
   constructor(args: EntityProps) {
     Object.assign(this, args);
@@ -40,9 +39,6 @@ export class Entity {
     }
     if (this.parallax == undefined) {
       this.parallax = new Vec2(1, 1);
-    }
-    if (this.opacity == undefined) {
-      this.opacity = 1;
     }
   }
   remove() {
@@ -271,12 +267,12 @@ export class Density {
   }
 }
 
-// Default Entity Prototypes
 export interface Outline {
   color: string;
   width: number;
 }
 
+// Default Entity Prototypes
 export interface RectangleProps extends EntityProps {
   color: string;
   stroke: Outline;
@@ -295,7 +291,6 @@ export class Rectangle extends Entity {
     modifiedH: number,
     ctx: CanvasRenderingContext2D
   ) {
-    //ctx.rotate(1);
     ctx.beginPath();
     ctx.rect(0, 0, modifiedW, modifiedH);
     ctx.fillStyle = item.color;
@@ -306,7 +301,6 @@ export class Rectangle extends Entity {
       ctx.lineWidth = item.stroke.width * this.renderer.renderScale;
       ctx.stroke();
     }
-    //ctx.rotate(-1);
   }
 }
 
