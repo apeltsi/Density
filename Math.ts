@@ -1,36 +1,97 @@
+/**
+ * 2-Dimensional Vector with some built in math functions.
+ */
 export class Vec2 {
   x: number;
   y: number;
-  constructor(x: number, y: number = undefined) {
-    if (y == undefined) {
-      this.x = x;
-      this.y = x;
-    } else {
+  /**
+   * Consturctor for the Vec2 class. 2-Dimensional Vector.
+   * @constructor
+   * @param {number} x - X value
+   * @param {number} y - Y value
+   * @example new Vec2(2, 5); //Returns {2,5}
+   * @returns {Vec2} {2,5}
+   * @example new Vec2(); //Returns {0,0}
+   * @returns {Vec2}{0,0}
+   * @example new Vec2(1); // Returns {1,1}
+   * @returns {Vec2} {1,1}
+   *
+   */
+  constructor(x: number = undefined, y: number = undefined) {
+    if (y != undefined) {
+      // Vec2(x,y)
       this.x = x;
       this.y = y;
+    } else if (x == undefined) {
+      // Vec2()
+      this.x = 0;
+      this.y = 0;
+    } else if (y == undefined) {
+      // Vec2(x)
+      this.x = x;
+      this.y = x;
     }
   }
+  /**
+   * Adds a vector to this vector
+   * @param {Vec2} vec_ Vector to add
+   * @returns this + vec_
+   */
   addV(vec_: Vec2) {
     return new Vec2(this.x + vec_.x, this.y + vec_.y);
   }
+  /**
+   * Subtracts a vector to from vector
+   * @param {Vec2} vec_ Vector to subtract by
+   * @returns this - vec_
+   */
   subV(vec_: Vec2) {
     return new Vec2(this.x - vec_.x, this.y - vec_.y);
   }
+  /**
+   * Gets the dot product of this vector
+   * @param {Vec2} vec_ Other vector
+   * @returns this.x * vec_.x + this.y * vec_.y
+   */
   dot(vec_: Vec2) {
     return this.x * vec_.x + this.y * vec_.y;
   }
+  /**
+   * Returns length of vector
+   */
   get length() {
     return Math.sqrt(this.dot(this));
   }
+  /**
+   * Divides this vector by the value provided
+   * @param {number} value Value to divide by
+   * @returns this / value
+   */
   divS(value: number) {
     return new Vec2(this.x / value, this.y / value);
   }
+  /**
+   * Multiplies this vector by another vector
+   * @param {Vec2} vec_ Vector to multiply by
+   * @returns this * vec_
+   */
   mulV(vec_: Vec2) {
     return new Vec2(this.x * vec_.x, this.y * vec_.y);
   }
+  /**
+   *
+   * @param {number} value Value to multiply by
+   * @returns this * value
+   */
   mulS(value: number) {
     return new Vec2(this.x * value, this.y * value);
   }
+  /**
+   *
+   * @param {number} min Minimum value
+   * @param {number} max Maximum value
+   * @returns {Vec2} Clamped value
+   */
   clamp(min: number, max: number) {
     var x = this.x;
     var y = this.y;
@@ -46,15 +107,25 @@ export class Vec2 {
     }
     return new Vec2(x, y);
   }
+  /**
+   * Returns magnitude of vector
+   * @returns {number} The magnitude of the vector
+   */
   magnitude() {
     return Math.sqrt(this.x * this.x + this.y * this.y);
   }
-
+  /**
+   *
+   * @returns {Vec2} The normalized vector
+   */
   normalize() {
     var m = this.magnitude();
     return this.divS(m);
   }
-
+  /**
+   * Rounds a vector
+   * @returns {Vec2} The rounded Vector
+   */
   round() {
     return new Vec2(Math.round(this.x), Math.round(this.y));
   }
