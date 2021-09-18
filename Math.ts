@@ -131,23 +131,45 @@ export class Vec2 {
   }
 }
 export default {
+  /**
+   * Calculates distance between vectors
+   * @param avec First vector
+   * @param bvec Second vector
+   * @returns Distance between vectors
+   */
   distance: function (avec: Vec2, bvec: Vec2) {
     var a = avec.x - bvec.x;
     var b = avec.y - bvec.y;
 
     return Math.sqrt(a * a + b * b);
   },
-  OneDDistance: function (a: number, b: number) {
-    var r = a - b;
-
-    return Math.abs(r);
-  },
+  /**
+   * Linearly interpolates between two values by the amount given
+   * @param v0 From value
+   * @param v1 To value
+   * @param t Time
+   * @returns Interpolated value
+   */
   lerp: function (v0: number, v1: number, t: number) {
     return v0 * (1 - t) + v1 * t;
   },
+  /**
+   * Linearly interpolates between two vectors by the amount given
+   * @param v0 From vector
+   * @param v1 To vector
+   * @param t Time
+   * @returns Interpolated vector
+   */
   veclerp: function (v0: Vec2, v1: Vec2, t: number) {
     return new Vec2(v0.x * (1 - t) + v1.x * t, v0.y * (1 - t) + v1.y * t);
   },
+  /**
+   * Clamps input between maximum and minimum value
+   * @param value Input val
+   * @param min Minimun value
+   * @param max Maximum value
+   * @returns Clamped value
+   */
   clamp: function (value: number, min: number, max: number) {
     if (value > max) {
       value = max;
@@ -157,22 +179,40 @@ export default {
     }
     return value;
   },
-  high: function (a: number, b: number) {
-    if (a > b) {
-      return a;
-    }
-    if (b > a) {
-      return b;
-    }
+  /**
+   * Returns the highest value in the provided array
+   * @param values Values
+   * @returns The highest value in the array
+   */
+  high: function (values: Number[]) {
+    let high: Number = Number.NEGATIVE_INFINITY;
+    values.forEach((element: Number) => {
+      if (element > high) {
+        high = element;
+      }
+    });
+    return high;
   },
-  low: function (a: number, b: number) {
-    if (b > a) {
-      return a;
-    }
-    if (a > b) {
-      return b;
-    }
+  /**
+   * Returns the lowest value in the provided array
+   * @param values Values
+   * @returns The lowest value in the array
+   */
+  low: function (values: Number[]) {
+    let low: Number = Number.POSITIVE_INFINITY;
+    values.forEach((element: Number) => {
+      if (element < low) {
+        low = element;
+      }
+    });
+    return low;
   },
+  /**
+   * Returns a bounding box that can fit all points.
+   * @param points Points
+   * @param width Radius of each point
+   * @returns Bounding box of all points
+   */
   getBoundingBox: function (points: Vec2[], width: number) {
     if (points.length < 1) {
       return {

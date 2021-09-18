@@ -1,7 +1,6 @@
 import { PriorityQueue, QElement } from "./PriorityQueue";
 import math, { Vec2 } from "./Math";
 export { math, Vec2 };
-
 export interface EntityProps {
   id: any; // Unique ID for every entity
   priority: number; // What layer should entity be rendered on higher = rendered later
@@ -129,9 +128,9 @@ export class Density {
       return true;
     }
     if (
-      math.OneDDistance(pos.x, this.getCamCenter().x) >
+      Math.abs(pos.x - this.getCamCenter().x) >
         (this.canvas.width / 2 + w) / this.renderScale ||
-      math.OneDDistance(pos.y, this.getCamCenter().y) >
+      Math.abs(pos.y - this.getCamCenter().y) >
         (this.canvas.height / 2 + h + this.height) / this.renderScale
     ) {
       return false;
