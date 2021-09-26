@@ -52,9 +52,10 @@ interface Stats {
   startTime: number;
   ver: String;
 }
-interface settings {
+export interface Settings {
   doCulling: boolean;
   frameMode: FrameMode;
+  canvas: HTMLCanvasElement;
 }
 export const sleep = (milliseconds: number) => {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -66,21 +67,22 @@ export class Density {
   c: CanvasRenderingContext2D;
   engine_entities = new PriorityQueue(); // ENTITIES OR RENDER QUEUE
 
-  updatefuncs: (() => void)[] = [];
-  resizefuncs: (() => void)[] = [];
+  updatefuncs: ((renderer: Density) => void)[] = [];
+  resizefuncs: ((renderer: Density) => void)[] = [];
   idsInUse: any[] = [];
   renderScale = 1;
   doCulling = true;
   frameMode = FrameMode.Manual;
   constructor(
-    settings: settings = <settings>{
+    settings: Settings = <Settings>{
       doCulling: true,
       frameMode: FrameMode.Browser,
+      canvas: undefined,
     }
   ) {
     this.doCulling = settings.doCulling;
     this.frameMode = settings.frameMode;
-    if (document.getElementsByTagName("canvas").length == 0) {
+    if (settings.canvas == undefined) {
       this.canvas = document.createElement("canvas");
       this.canvas.style.minHeight = "1px";
       this.canvas.style.minWidth = "1px";
@@ -89,24 +91,27 @@ export class Density {
       this.canvas = this.canvas;
       this.c = this.canvas.getContext("2d");
       console.log(
-        "Density couldn't find a canvas. Creating and appending a new one."
+        "Density didn't recieve a canvas. Creating and appending a new one."
       );
+    } else {
+      this.canvas = settings.canvas;
+      this.c = this.canvas.getContext("2d");
     }
     if (this.frameMode == FrameMode.Browser) {
       requestAnimationFrame(() => this.frame());
     }
-    this.doResize(this);
     this.stats.startTime = Date.now();
-    this.resizefuncs.push(function resize() {
-      this.canvas.width = this.canvas.clientWidth;
-      this.canvas.height = this.canvas.clientHeight;
-      this.width = this.canvas.width;
-      this.height = this.canvas.height;
-      this.canvasOffset = new Vec2(
-        this.canvas.getBoundingClientRect().left,
-        this.canvas.getBoundingClientRect().top
+    this.resizefuncs.push(function resize(renderer: Density) {
+      renderer.canvas.width = renderer.canvas.clientWidth;
+      renderer.canvas.height = renderer.canvas.clientHeight;
+      renderer.width = renderer.canvas.width;
+      renderer.height = renderer.canvas.height;
+      renderer.canvasOffset = new Vec2(
+        renderer.canvas.getBoundingClientRect().left,
+        renderer.canvas.getBoundingClientRect().top
       );
     });
+    this.doResize(this);
     window.onresize = () => this.doResize(this);
   }
 
@@ -138,11 +143,22 @@ export class Density {
       return true;
     }
   }
+  /**
+   * Translates a point from html Canvas space to Density Space
+   * @param point Point to be translated
+   * @returns {Vec2} Translated point
+   */
+  translatePoint(point: Vec2) {
+    return new Vec2(
+      (point.x + this.camPos.x) * this.renderScale + -this.canvas.width / 2,
+      (-point.y + this.camPos.y) * this.renderScale + this.canvas.height / 2
+    );
+  }
 
   frame() {
     // DRAWS A FRAME
-    this.updatefuncs.forEach((func: () => void) => {
-      func();
+    this.updatefuncs.forEach((func: (renderer: Density) => void) => {
+      func(this);
     });
     this.c.clearRect(0, 0, this.canvas.width, this.canvas.height);
     let entitiesQueue = new PriorityQueue(this.engine_entities.items);
@@ -163,28 +179,26 @@ export class Density {
         this.inRenderFrame(item.pos, item.scale.x, item.scale.y) ||
         !item.global
       ) {
-        let posModifierX = 0;
-        let posModifierY = 0;
         let modifiedX = item.pos.x;
         let modifiedY = item.pos.y;
         let modifiedW = item.scale.x;
         let modifiedH = item.scale.y;
         if (item.global) {
           modifiedX =
-            (item.pos.x - this.camPos.x - posModifierX - item.scale.x / 2) *
+            (item.pos.x - this.camPos.x - item.scale.x / 2) *
               this.renderScale *
               item.parallax.x +
             this.width / 2;
           modifiedY =
-            (-item.pos.y + this.camPos.y + posModifierY - item.scale.y / 2) *
+            (-item.pos.y + this.camPos.y - item.scale.y / 2) *
               this.renderScale *
               item.parallax.y +
             this.height / 2;
           modifiedW = item.scale.x * this.renderScale;
           modifiedH = item.scale.y * this.renderScale;
         } else {
-          modifiedX = item.pos.x - posModifierX;
-          modifiedY = -item.pos.y + posModifierY;
+          modifiedX = item.pos.x;
+          modifiedY = -item.pos.y;
         }
         this.c.translate(modifiedX, modifiedY);
         item.render(item, modifiedW, modifiedH, this.c);
@@ -250,10 +264,11 @@ export class Density {
   doResize(renderer: Density) {
     for (let i = 0; i < renderer.resizefuncs.length; i++) {
       const element = renderer.resizefuncs[i];
-      element();
+      element(renderer);
     }
   }
   registerResizeEvent(func: () => void) {
     this.resizefuncs.push(func);
   }
 }
+export default Density;

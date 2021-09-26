@@ -1,7 +1,14 @@
+import Density from "./Core";
+import { Vec2 } from "./Math";
+
 document.addEventListener("keydown", logKey);
 document.addEventListener("keyup", logKeyUp);
+document.addEventListener("mousemove", mouseMove);
 let keysDown: KeyDown[] = [];
-
+export let mouseClientPos: Vec2 = new Vec2();
+function mouseMove(e: MouseEvent) {
+  mouseClientPos = new Vec2(e.clientX, e.clientY);
+}
 function logKey(e: KeyboardEvent) {
   for (var i = 0; i < keysDown.length; i++) {
     if (keysDown[i].key == e.code) {
@@ -38,6 +45,20 @@ export function getKey(key: string) {
     }
   }
   return false;
+}
+export function getMousePos(renderer: Density) {
+  let modifiedPos = renderer.translatePoint(
+    mouseClientPos.subV(
+      new Vec2(renderer.canvas.clientLeft, renderer.canvas.clientTop)
+    )
+  );
+  return modifiedPos;
+}
+export function getMouseCanvasPos(canvas: HTMLCanvasElement) {
+  let modifiedPos = mouseClientPos.subV(
+    new Vec2(canvas.clientLeft, canvas.clientTop)
+  );
+  return modifiedPos;
 }
 class KeyDown {
   key: string;
