@@ -10,14 +10,19 @@ export interface Outline {
 export interface RectangleProps extends EntityProps {
   color: string;
   stroke: Outline;
+  opacity: number;
 }
 export class Rectangle extends Entity {
   color: string;
   stroke: Outline;
+  opacity: number = 1;
   constructor(args: RectangleProps) {
     super(args);
     this.color = args.color;
     this.stroke = args.stroke;
+    if (args.opacity != undefined) {
+      this.opacity = args.opacity;
+    }
   }
   render(
     item: Rectangle,
@@ -25,6 +30,7 @@ export class Rectangle extends Entity {
     modifiedH: number,
     ctx: CanvasRenderingContext2D
   ) {
+    ctx.globalAlpha = this.opacity;
     ctx.beginPath();
     ctx.rect(0, 0, modifiedW, modifiedH);
     ctx.fillStyle = item.color;
@@ -35,6 +41,7 @@ export class Rectangle extends Entity {
       ctx.lineWidth = item.stroke.width * this.renderer.renderScale;
       ctx.stroke();
     }
+    ctx.globalAlpha = 1;
   }
 }
 

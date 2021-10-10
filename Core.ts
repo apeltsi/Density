@@ -4,7 +4,7 @@ export { math, Vec2 };
 export interface EntityProps {
   id: any; // Unique ID for every entity
   priority: number; // What layer should entity be rendered on higher = rendered later
-  pos: Vec2; // Global position. 0 0 = center of screen
+  pos: Vec2; // Global position. (0,0) = center of screen
   scale: Vec2; // Global scale of entity
   global: boolean; // Should entity use local or global coordinate system
   visible: boolean; // Should object be rendered?
@@ -17,7 +17,7 @@ export enum FrameMode {
 }
 export class Entity {
   id: any; // Unique ID for every entity
-  priority: number; // What layer should entity be rendered on higher = rendered later
+  private _priority: number; // What layer should entity be rendered on higher = rendered later
   pos: Vec2; // Global position. 0 0 = center of screen
   scale: Vec2; // Global scale of entity
   global: boolean; // Should entity use local or global coordinate system
@@ -25,6 +25,21 @@ export class Entity {
   parallax: Vec2; // Should parallax be used?
   renderer: Density; // What instance is rendering this entity?
 
+  public get priority() {
+    return this._priority;
+  }
+  public set priority(priority: number) {
+    // We have to re-insert this entity in to the entity queue to reorder by the new priority
+    this._priority = priority;
+    if (this.renderer == undefined) {
+      // Nothing to do as the entity currently isn't being rendered and doesn't exist on a entity queue
+      return;
+    } else {
+      this.renderer.removeDraw(this.id);
+      this.renderer.draw(this);
+      return;
+    }
+  }
   constructor(args: EntityProps) {
     Object.assign(this, args);
     if (this.priority == undefined) {
@@ -42,6 +57,54 @@ export class Entity {
   }
   remove() {
     this.renderer.removeDraw(this.id);
+    this.renderer = undefined; // Remove our reference to the renderer at it is no longer needed
+  }
+  /**
+   * Translates global position to object position. (Canvas space with offset)
+   */
+  getLocalPos() {
+    let modifiedX = this.pos.x;
+    let modifiedY = this.pos.y;
+    if (this.global) {
+      modifiedX =
+        (this.pos.x - this.renderer.camPos.x - this.scale.x / 2) *
+          this.renderer.renderScale *
+          this.parallax.x +
+        this.renderer.width / 2;
+      modifiedY =
+        (-this.pos.y + this.renderer.camPos.y - this.scale.y / 2) *
+          this.renderer.renderScale *
+          this.parallax.y +
+        this.renderer.height / 2;
+    } else {
+      modifiedX = this.pos.x;
+      modifiedY = -this.pos.y;
+    }
+    return new Vec2(modifiedX, modifiedY);
+  }
+  globalToLocal(global: Vec2) {
+    if (this.renderer == undefined) {
+      return null;
+    }
+    let modifiedX = global.x;
+    let modifiedY = global.y;
+    if (this.global) {
+      modifiedX =
+        (global.x - this.renderer.camPos.x) *
+          this.renderer.renderScale *
+          this.parallax.x +
+        this.renderer.width / 2;
+      modifiedY =
+        (-global.y + this.renderer.camPos.y) *
+          this.renderer.renderScale *
+          this.parallax.y +
+        this.renderer.height / 2;
+    } else {
+      modifiedX = global.x;
+      modifiedY = -global.y;
+    }
+    let diff = new Vec2(modifiedX, modifiedY).subV(this.getLocalPos());
+    return diff;
   }
 }
 
@@ -53,9 +116,10 @@ interface Stats {
   ver: String;
 }
 export interface Settings {
-  doCulling: boolean;
-  frameMode: FrameMode;
-  canvas: HTMLCanvasElement;
+  doCulling: boolean; // Should density cull drawables outside of the view
+  frameMode: FrameMode; // Should density automatically render whenever the browser allows or only when frame() is called
+  canvas: HTMLCanvasElement; // Canvas to render on
+  doClear: boolean; //Should the canvas be cleared before every frame
 }
 export const sleep = (milliseconds: number) => {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -72,16 +136,25 @@ export class Density {
   idsInUse: any[] = [];
   renderScale = 1;
   doCulling = true;
-  frameMode = FrameMode.Manual;
+  frameMode = FrameMode.Browser;
+  doClear = true; // Should the canvas be cleared before every frame
   constructor(
     settings: Settings = <Settings>{
       doCulling: true,
       frameMode: FrameMode.Browser,
       canvas: undefined,
+      doClear: true,
     }
   ) {
-    this.doCulling = settings.doCulling;
-    this.frameMode = settings.frameMode;
+    if (settings.doCulling != undefined) {
+      this.doCulling = settings.doCulling;
+    }
+    if (settings.frameMode != undefined) {
+      this.frameMode = settings.frameMode;
+    }
+    if (settings.doClear != undefined) {
+      this.doClear = settings.doClear;
+    }
     if (settings.canvas == undefined) {
       this.canvas = document.createElement("canvas");
       this.canvas.style.minHeight = "1px";
@@ -90,20 +163,19 @@ export class Density {
       document.body.appendChild(this.canvas);
       this.canvas = this.canvas;
       this.c = this.canvas.getContext("2d");
-      console.log(
-        "Density didn't recieve a canvas. Creating and appending a new one."
-      );
+      console.log("No canvas was specified. Creating and appending a new one.");
     } else {
       this.canvas = settings.canvas;
       this.c = this.canvas.getContext("2d");
     }
+
     if (this.frameMode == FrameMode.Browser) {
       requestAnimationFrame(() => this.frame());
     }
     this.stats.startTime = Date.now();
     this.resizefuncs.push(function resize(renderer: Density) {
-      renderer.canvas.width = renderer.canvas.clientWidth;
-      renderer.canvas.height = renderer.canvas.clientHeight;
+      //renderer.canvas.width = renderer.canvas.clientWidth;
+      //renderer.canvas.height = renderer.canvas.clientHeight;
       renderer.width = renderer.canvas.width;
       renderer.height = renderer.canvas.height;
       renderer.canvasOffset = new Vec2(
@@ -149,6 +221,10 @@ export class Density {
    * @returns {Vec2} Translated point
    */
   translatePoint(point: Vec2) {
+    point = new Vec2(
+      (point.x / this.canvas.clientWidth) * this.width,
+      (point.y / this.canvas.clientHeight) * this.height
+    );
     return new Vec2(
       (point.x + this.camPos.x) * this.renderScale + -this.canvas.width / 2,
       (-point.y + this.camPos.y) * this.renderScale + this.canvas.height / 2
@@ -160,7 +236,8 @@ export class Density {
     this.updatefuncs.forEach((func: (renderer: Density) => void) => {
       func(this);
     });
-    this.c.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    if (this.doClear)
+      this.c.clearRect(0, 0, this.canvas.width, this.canvas.height);
     let entitiesQueue = new PriorityQueue(this.engine_entities.items);
     let length = entitiesQueue.length;
     for (let i = 0; i < length; i++) {
@@ -218,34 +295,47 @@ export class Density {
   moveCamera(pos: Vec2) {
     this.camPos = pos;
   }
+
   localToGlobal(pos: Vec2) {
     return new Vec2(
       (pos.x + this.camPos.x - this.width / 2) / this.renderScale,
       (pos.y + this.camPos.y - this.height / 2) / this.renderScale
     );
   }
+
   draw(entity: Entity) {
     if (entity == undefined) {
       console.error("ILLEGAL ENTITY");
       return undefined;
     }
     if (entity.id == undefined) {
-      entity.id = this.getEntityID();
+      entity.id = this.generateEntityID();
     }
     entity.renderer = this;
     this.idsInUse[this.idsInUse.length] = entity.id;
     const index = this.engine_entities.enqueue(entity, entity.priority);
     return this.engine_entities.items[index].element;
   }
+  /**
+   *
+   * @param id Entity ID to remove
+   */
   removeDraw(id: number) {
     this.engine_entities.remove(id);
   }
+  /**
+   * Replaces an entity in the entity queue
+   * @deprecated Function will be removed in the future. Change values manually instead.
+   * @param id Id of entity
+   * @param newEntity New entity
+   * @returns Entity reference
+   */
   changeDraw(id: any, newEntity: Entity) {
-    // REPLACES THE DRAWABLE
+    // Replaces the entity
     this.removeDraw(id);
     return this.draw(newEntity);
   }
-  getEntityID() {
+  generateEntityID() {
     let id = Math.round(Math.random() * Number.MAX_SAFE_INTEGER);
     for (let i = 0; i < this.idsInUse.length; i++) {
       if (this.idsInUse[i] == id) {
