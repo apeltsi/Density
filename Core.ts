@@ -24,7 +24,7 @@ export class Entity {
   visible: boolean; // Should object be rendered?
   parallax: Vec2; // Should parallax be used?
   renderer: Density; // What instance is rendering this entity?
-
+  ignoreCulling: boolean;
   public get priority() {
     return this._priority;
   }
@@ -53,6 +53,9 @@ export class Entity {
     }
     if (this.parallax == undefined) {
       this.parallax = new Vec2(1, 1);
+    }
+    if (this.ignoreCulling == undefined) {
+      this.ignoreCulling = false;
     }
   }
   remove() {
@@ -254,7 +257,8 @@ export class Density {
       }
       if (
         this.inRenderFrame(item.pos, item.scale.x, item.scale.y) ||
-        !item.global
+        !item.global ||
+        item.ignoreCulling
       ) {
         let modifiedX = item.pos.x;
         let modifiedY = item.pos.y;
