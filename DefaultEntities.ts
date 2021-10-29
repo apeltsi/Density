@@ -47,12 +47,19 @@ export class Rectangle extends Entity {
 
 export interface SpriteProps extends EntityProps {
   image: CanvasImageSource;
+  opacity: number;
 }
 export class Sprite extends Entity {
   image: CanvasImageSource;
+  opacity: number;
   constructor(args: SpriteProps) {
     super(args);
     this.image = args.image;
+    if (args.opacity != undefined) {
+      this.opacity = args.opacity;
+    } else {
+      this.opacity = 1;
+    }
   }
   render(
     item: Sprite,
@@ -63,7 +70,9 @@ export class Sprite extends Entity {
     if (item.image == undefined) {
       return;
     }
+    ctx.globalAlpha = this.opacity;
     ctx.drawImage(item.image, 0, 0, modifiedW, modifiedH);
+    ctx.globalAlpha = 1;
   }
 }
 
