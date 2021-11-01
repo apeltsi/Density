@@ -131,7 +131,7 @@ export const sleep = (milliseconds: number) => {
 // THIS SCRIPT HANDLES THE RENDERING SYSTEM
 export class Density {
   canvas: HTMLCanvasElement;
-  c: CanvasRenderingContext2D;
+  c: CanvasRenderingContext2D | any;
   engine_entities = new PriorityQueue(); // ENTITIES OR RENDER QUEUE
 
   updatefuncs: ((renderer: Density) => void)[] = [];
@@ -186,8 +186,8 @@ export class Density {
         renderer.canvas.getBoundingClientRect().top
       );
     });
-    this.doResize(this);
-    window.onresize = () => this.doResize(this);
+    this.doResize();
+    window.onresize = () => this.doResize();
   }
 
   stats: Stats = {
@@ -355,14 +355,15 @@ export class Density {
   registerUpdateEvent(func: () => void) {
     this.updatefuncs[this.updatefuncs.length] = func;
   }
-  doResize(renderer: Density) {
-    for (let i = 0; i < renderer.resizefuncs.length; i++) {
-      const element = renderer.resizefuncs[i];
-      element(renderer);
+  doResize() {
+    for (let i = 0; i < this.resizefuncs.length; i++) {
+      const element = this.resizefuncs[i];
+      element(this);
     }
   }
   registerResizeEvent(func: () => void) {
     this.resizefuncs.push(func);
+    this.doResize();
   }
 }
 export default Density;
