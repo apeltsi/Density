@@ -283,7 +283,8 @@ export class Density {
         }
         this.c.translate(modifiedX, modifiedY);
         item.render(item, modifiedW, modifiedH, this.c);
-        this.c.translate(-modifiedX, -modifiedY);
+
+        this.c.resetTransform();
       }
     }
     this.stats.currentFrameTime = Date.now() - this.stats.lastFrameTime;
