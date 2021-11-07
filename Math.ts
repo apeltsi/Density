@@ -271,4 +271,7 @@ export default {
     }
     return boundingBox;
   },
+  vecabs(a: Vec2) {
+    return new Vec2(Math.abs(a.x), Math.abs(a.y));
+  },
 };
