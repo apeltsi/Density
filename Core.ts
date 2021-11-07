@@ -219,7 +219,7 @@ export class Density {
     }
   }
   /**
-   * Translates a point from html Canvas space to Density Space
+   * Translates a point from HTML space (relative to the canvas) to Density Space
    * @param point Point to be translated
    * @returns {Vec2} Translated point
    */
