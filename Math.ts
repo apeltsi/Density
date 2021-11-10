@@ -198,9 +198,9 @@ export default {
    * @param values Values
    * @returns The lowest value in the array
    */
-  low: function (values: Number[]) {
-    let low: Number = Number.POSITIVE_INFINITY;
-    values.forEach((element: Number) => {
+  low: function (values: number[]) {
+    let low: number = Number.POSITIVE_INFINITY;
+    values.forEach((element: number) => {
       if (element < low) {
         low = element;
       }
