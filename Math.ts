@@ -124,7 +124,7 @@ export class Vec2 {
   }
   /**
    * Rounds a vector
-   * @returns {Vec2} The rounded Vector
+   * @returns {Vec2} The rounded vector
    */
   round() {
     return new Vec2(Math.round(this.x), Math.round(this.y));
@@ -184,9 +184,9 @@ export default {
    * @param values Values
    * @returns The highest value in the array
    */
-  high: function (values: Number[]) {
-    let high: Number = Number.NEGATIVE_INFINITY;
-    values.forEach((element: Number) => {
+  high: function (values: number[]) {
+    let high: number = Number.NEGATIVE_INFINITY;
+    values.forEach((element: number) => {
       if (element > high) {
         high = element;
       }
