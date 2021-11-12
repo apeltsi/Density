@@ -282,7 +282,16 @@ export class Density {
           modifiedY = -item.pos.y;
         }
         this.c.translate(modifiedX, modifiedY);
-        item.render(item, modifiedW, modifiedH, this.c);
+        try {
+          item.render(item, modifiedW, modifiedH, this.c);
+        } catch (e) {
+          console.error(e);
+          this.c.fillStyle = "#ff00ff";
+          this.c.fillRect(0, 0, modifiedW, modifiedH);
+          this.c.fillStyle = "#000000";
+          this.c.fillRect(modifiedW / 2, 0, modifiedW / 2, modifiedH / 2);
+          this.c.fillRect(0, modifiedH / 2, modifiedW / 2, modifiedH / 2);
+        }
 
         this.c.resetTransform();
       }
