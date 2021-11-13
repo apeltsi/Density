@@ -187,7 +187,9 @@ export class Density {
       );
     });
     this.doResize();
-    window.onresize = () => this.doResize();
+    window.addEventListener("resize", () => {
+      this.doResize();
+    });
   }
 
   stats: Stats = {
