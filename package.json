@@ -1,11 +1,11 @@
 {
     "name": "density",
-    "version": "1.0.0",
-    "description": "",
+    "version": "3.0.0",
+    "description": "The Density graphics API",
     "main": "Core.ts",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "author": "Amos Peltonen",
-    "license": "ISC"
+    "license": "MIT"
 }
