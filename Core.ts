@@ -365,7 +365,7 @@ export class Density {
     return new Vec2(this.camPos.x, this.camPos.y);
   }
   registerUpdateEvent(func: () => void) {
-    this.updatefuncs[this.updatefuncs.length] = func;
+    this.updatefuncs.push(func);
   }
   doResize() {
     for (let i = 0; i < this.resizefuncs.length; i++) {
