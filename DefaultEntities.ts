@@ -124,25 +124,3 @@ export class Text extends Entity {
     ctx.fillText(item.text, 0, 0);
   }
 }
-
-export interface CircleProps extends EntityProps {
-  color: string;
-}
-export class Circle extends Entity {
-  color: string;
-  constructor(args: TextProps) {
-    super(args);
-    this.color = args.color;
-  }
-  render(
-    item: Circle,
-    modifiedW: number,
-    modifiedH: number,
-    ctx: CanvasRenderingContext2D
-  ) {
-    ctx.beginPath();
-    ctx.arc(0, 0, modifiedW, 0, 2 * Math.PI);
-    ctx.fillStyle = item.color;
-    ctx.fill();
-  }
-}
