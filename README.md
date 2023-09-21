@@ -36,6 +36,10 @@ let resultant = vec.addV(otherVec);
 console.log(resultant);
 ```
 
+## Mini Showcase
+
+![showcase](https://github.com/apeltsi/Density/assets/49206921/86f5b225-b4b5-4c79-b1e7-723fa7d42569)
+
 ## Coming from Density 2
 
 This is the Rewrite of Density 2.0 in TypeScript. Density 3 SHOULD be faster, smaller, and easier to use. The project structure is also a LOT better! Density 3 Also supports instancing. This means that the old density-cluster-renderer is finally gone! 
